@@ -15,9 +15,9 @@ GPIO.setwarnings(False)
 # Set variables for the GPIO pins
 PinWallbox = 12 # Signal from Wallbox
 pinWallboxPower = 13 # Wallbox On
-pinWallboxPowerLED = 20 # Wallbox On
+pinWallboxPowerLED = 23 # Wallbox On
 pinWallboxSignalLED = 22 # Wallbox Signal
-pinTrackRequestLED = 23 # Track request sent
+pinTrackRequestLED = 20 # Track request sent
 pinPlayerFoundLED = 21 # Connection to player
 
 GPIO.setup(PinWallbox, GPIO.IN)
@@ -73,8 +73,8 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Raspberry Pi JukeBox Wallbox client')
 
-parser.add_argument('-ip', action='store', dest='player_IP_Address', default='192.168.1.118',
-                    help='IP Address of Domoticz server (e.g. 192.168.1.118)')
+parser.add_argument('-ip', action='store', dest='player_IP_Address', default='raspi-jukebox',
+                    help='IP Address of Domoticz server (e.g. 192.168.1.118 or raspi-jukebox)')
 
 arguments = parser.parse_args()
 
@@ -85,7 +85,7 @@ def addToPlaylist(track):
     selection = '000' + str(track)
     selection = 'sel' + selection[-3:]
      
-    url = 'http://' + player_IP_Address + '/' + selection + '/play'
+    url = 'http://' + player_IP_Address + '/' + selection + '/add'
     try:
         request = urllib2.Request(url)
         response = urllib2.urlopen(request)
@@ -179,7 +179,7 @@ try:
                     time.sleep(0.001)
                     if time.time() - PosEdgeTime > Finish_Timeout: # Look for a long time without a positive edge to identify the end
                         if Finished == False:
-                            print("Selection: ", alpha, numeric)
+                            print("Selection: ", alpha-1, numeric)
                             addToPlaylist((alpha - 2) * numbers + numeric)
                             if playerFound == True:
                                 # Flash green LED for 1s
