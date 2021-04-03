@@ -81,22 +81,48 @@ arguments = parser.parse_args()
 # Read arguments...
 player_IP_Address = arguments.player_IP_Address
 
+def ping(player_IP_Address):
+     
+    print("Pinging Player...")
+    url = 'http://' + player_IP_Address + '/' + 'system/ping'
+    print("url: ",url)
+    try:
+        request = urllib2.Request(url)
+        print("Request: ",request)
+        response = urllib2.urlopen(request)
+        print("Response: ",response)
+        playerFound = True
+    except urllib2.HTTPError, e:
+        print("e.code: ",e.code);
+        print("e.args: ",e.args);
+        playerFound = False
+    except urllib2.URLError, e:
+        print("e.code: ",e.code);
+        print("e.args: ",e.args);
+        playerFound = False
+    
+    return(playerFound)
+
 def addToPlaylist(track):
     selection = '000' + str(track)
     selection = 'sel' + selection[-3:]
      
+    print("Requesting Track...")
     url = 'http://' + player_IP_Address + '/' + selection + '/add'
+    print("url: ",url)
     try:
         request = urllib2.Request(url)
+        print("Request: ",request)
         response = urllib2.urlopen(request)
+        print("Response: ",response)
         playerFound = True
     except urllib2.HTTPError, e:
-        #logger.info(e.code)
-        print e.code;
+        print("e.code: ",e.code);
+        print("e.args: ",e.args);
         playerFound = False
     except urllib2.URLError, e:
-        #logger.info(e.args)
-        print e.args;
+        print("e.code: ",e.code);
+        print("e.args: ",e.args);
         playerFound = False
     
     return(playerFound)
@@ -149,19 +175,7 @@ try:
             # Search for JukeBox player...
             print("Looking for player at IP Address ", player_IP_Address)
             
-            url = 'http://' + player_IP_Address + '/ping'
-            try:
-                request = urllib2.Request(url)
-                #response = urllib2.urlopen(request)
-                playerFound = True
-            except urllib2.HTTPError, e:
-                logger.info(e.code)
-                print e.code;
-                playerFound = False
-            except urllib2.URLError, e:
-                logger.info(e.args)
-                print e.args;
-                playerFound = False
+            playerFound = ping(player_IP_Address)
 
             if playerFound:
                 print("Player found")
@@ -186,11 +200,31 @@ try:
                                 GPIO.output(pinTrackRequestLED, True)
                                 time.sleep(1)
                                 GPIO.output(pinTrackRequestLED, False)
+                            else:
+                                print("Player unavailable")
+                                GPIO.output(pinTrackRequestLED, True)
+                                time.sleep(0.125)
+                                GPIO.output(pinTrackRequestLED, False)
+                                time.sleep(0.125)
+                                GPIO.output(pinTrackRequestLED, True)
+                                time.sleep(0.125)
+                                GPIO.output(pinTrackRequestLED, False)
+                                time.sleep(0.125)
+                                GPIO.output(pinTrackRequestLED, True)
+                                time.sleep(0.125)
+                                GPIO.output(pinTrackRequestLED, False)
+                                time.sleep(0.125)
+                                GPIO.output(pinTrackRequestLED, True)
+                                time.sleep(0.125)
+                                GPIO.output(pinTrackRequestLED, False)
+                                time.sleep(0.125)
+
                             Finished = True
 
                 NegEdgeTime = time.time()
                 HighTime = NegEdgeTime - PosEdgeTime
                 GPIO.output(pinWallboxSignalLED, True)
+                print("High time: ", HighTime)
 
                 if Finished: #
                     #print("Starting Alpha...")
@@ -214,6 +248,7 @@ try:
                 PosEdgeTime = time.time()
                 LowTime = PosEdgeTime - NegEdgeTime
                 GPIO.output(pinWallboxSignalLED, False)
+                print("Low time: ", LowTime)
 
                 if phase == 0:
                     alpha = alpha + 1
