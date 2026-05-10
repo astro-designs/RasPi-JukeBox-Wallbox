@@ -116,6 +116,10 @@ def addToPlaylist(track):
         ack = response.read()  # avoids broken pipe
         print("Response: ",response)
 
+        message = "Request to play selection " + selection
+        logger.info(message)
+        print(message)
+
         playerFound = True
 
     except urllib2.HTTPError, e:
@@ -191,10 +195,13 @@ try:
             # Search for JukeBox player...
             print("Looking for player at IP Address ", player_IP_Address)
             
-            url = 'http://' + player_IP_Address + '/ping'
+            #url = 'http://' + player_IP_Address + '/ping' #ping not supported
+            url = 'http://' + player_IP_Address
             try:
                 request = urllib2.Request(url)
                 response = urllib2.urlopen(request, timeout=10)
+                ack = response.read()  # avoids broken pipe
+                print("Response: ",response)
                 message = "Player found at " + player_IP_Address
                 logger.info(message)
                 print(message)
