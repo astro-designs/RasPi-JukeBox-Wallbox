@@ -194,7 +194,10 @@ try:
             url = 'http://' + player_IP_Address + '/ping'
             try:
                 request = urllib2.Request(url)
-                response = urllib2.urlopen(request, timeout=5)
+                response = urllib2.urlopen(request, timeout=10)
+                message = "Player found at " + player_IP_Address
+                logger.info(message)
+                print(message)
                 playerFound = True
             except urllib2.HTTPError, e:
                 message = "HTTPError code: %s" % e.code
