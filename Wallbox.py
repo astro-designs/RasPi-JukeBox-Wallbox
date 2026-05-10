@@ -1,12 +1,37 @@
+'''
+
+RasPi-JukeBox - Wallbox - the Raspberry Pi JukeBox - Wallbox Interface, created by Mark Cantrill @Astro-Designs
+
+To do...
+    Make it run under Python 3
+    Cleanup
+    Test
+
+'''
+
+
 import RPi.GPIO as GPIO
 import time
 from datetime import datetime
 import os
-import sys
-import math
-import urllib
 import urllib2
-import requests
+import logging
+import argparse
+
+version = "1.1.1"
+
+# Create log folder if it doesn't exist...
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
+# Setup Log to file function
+logfile = 'logs/' + time.strftime("%B-%d-%Y-%I-%M-%S%p") + '.log'
+logger = logging.getLogger('WallBox')
+hdlr = logging.FileHandler(logfile)
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr) 
+logger.setLevel(logging.INFO)
 
 # Set the GPIO modes
 GPIO.setmode(GPIO.BCM)
@@ -34,13 +59,17 @@ GPIO.output(pinTrackRequestLED, False)
 
 # Initialise variables...
 playerFound = False
-PosEdgeTime = 0.0
-NegEdgeTime = 0.0
+PosEdgeTime = time.time()
+NegEdgeTime = time.time()
 Started = False
 Finished = True
 phase = 0
 alpha = 0
 numeric = 0
+
+# Define some constants
+Finish_Timeout = 1.0
+Alpha_Timeout = 0.1
 
 # Dictionary of supported configuration files
 Wallbox_models = {
@@ -58,19 +87,7 @@ Wallbox_models = {
     12 : {'filename' : 'c3s03.cnf', 'rand_timeout' : 900, 'model' : 'Seeburg 3WA', 'num_letters' : 20, 'num_numbers' : 10, 'num_indexes' : 200}
     }
 
-pins = {
-   23 : {'name' : 'GPIO 23', 'state' : GPIO.LOW},
-   24 : {'name' : 'GPIO 24', 'state' : GPIO.LOW}
-   }
-
-
-# Define some constants
-Finish_Timeout = 1.0
-Alpha_Timeout = 0.1
-
-
-import argparse
-
+# Parse any arguments used...
 parser = argparse.ArgumentParser(description='Raspberry Pi JukeBox Wallbox client')
 
 parser.add_argument('-ip', action='store', dest='player_IP_Address', default='raspi-jukebox',
@@ -81,56 +98,52 @@ arguments = parser.parse_args()
 # Read arguments...
 player_IP_Address = arguments.player_IP_Address
 
-def ping(player_IP_Address):
-     
-    print("Pinging Player...")
-    url = 'http://' + player_IP_Address + '/' + 'system/ping'
-    print("url: ",url)
-    try:
-        request = urllib2.Request(url)
-        print("Request: ",request)
-        response = urllib2.urlopen(request)
-        print("Response: ",response)
-        playerFound = True
-    except urllib2.HTTPError, e:
-        print("e.code: ",e.code);
-        print("e.args: ",e.args);
-        playerFound = False
-    except urllib2.URLError, e:
-        print("e.code: ",e.code);
-        print("e.args: ",e.args);
-        playerFound = False
-    
-    return(playerFound)
-
 def addToPlaylist(track):
     selection = '000' + str(track)
     selection = 'sel' + selection[-3:]
-     
+
     print("Requesting Track...")
     url = 'http://' + player_IP_Address + '/' + selection + '/add'
     print("url: ",url)
+
+    playerFound = False   # ensure always defined
+
     try:
         request = urllib2.Request(url)
         print("Request: ",request)
-        response = urllib2.urlopen(request)
-        print("Response: ",response)
-        playerFound = True
-    except urllib2.HTTPError, e:
-        print("e.code: ",e.code);
-        print("e.args: ",e.args);
-        playerFound = False
-    except urllib2.URLError, e:
-        print("e.code: ",e.code);
-        print("e.args: ",e.args);
-        playerFound = False
-    
-    return(playerFound)
 
+        response = urllib2.urlopen(request, timeout=10)
+        ack = response.read()  # avoids broken pipe
+        print("Response: ",response)
+
+        playerFound = True
+
+    except urllib2.HTTPError, e:
+        print("HTTPError code: %s" % e.code)
+        print("HTTPError args: %s" % (e.args,))
+
+    except urllib2.URLError, e:
+        print("URLError reason: %s" % getattr(e, 'reason', None))
+        print("URLError args: %s" % (e.args,))
+
+    return playerFound
+
+# Function to flash an LED...
+def blink(pin, t_on=0.5, t_off=0.5, cycles=1, invert=False):
+    for flash in range(cycles):
+        GPIO.output(pin, not invert)
+        time.sleep(t_on)
+        GPIO.output(pin, invert)
+        time.sleep(t_off)
+    
 try:
 
     print("Raspberry Pi JukeBox")
-    print("Wallbox client")
+    message = "Starting Wallbox client"
+    print(message)
+    logger.info(message)    
+
+    print("Version: " + version)
     
     # Search for Wallbox config file...
     print("Searching for configuration file...")
@@ -153,7 +166,10 @@ try:
             break
     
     if num_indexes == 0:
-        print("Error reading configuration file!")    
+        message = "Error reading configuration file!"
+        print(message)    
+        logger.info(message)    
+        
     else:
         print("Configuration: " + Wallbox_models[model]['model'])
     
@@ -175,13 +191,35 @@ try:
             # Search for JukeBox player...
             print("Looking for player at IP Address ", player_IP_Address)
             
-            playerFound = ping(player_IP_Address)
+            url = 'http://' + player_IP_Address + '/ping'
+            try:
+                request = urllib2.Request(url)
+                response = urllib2.urlopen(request, timeout=5)
+                playerFound = True
+            except urllib2.HTTPError, e:
+                message = "HTTPError code: %s" % e.code
+                logger.info(message)
+                print(message)
+                message = "URLError args: %s" % (e.args,)
+                logger.info(message)
+                print(message)
+                playerFound = False
+            except urllib2.URLError, e:
+                message = "URLError reason: %s" % getattr(e, 'reason', None)
+                logger.info(message)
+                print(message)
+                message = "URLError args: %s" % (e.args,)
+                logger.info(message)
+                print(message)
+                playerFound = False
 
             if playerFound:
                 print("Player found")
                 GPIO.output(pinPlayerFoundLED, True)
             else:
-                print("Player unavailable")
+                message = "Player unavailable"
+                logger.info(message)
+                print(message)
                 GPIO.output(pinPlayerFoundLED, False)
             
             while playerFound:
@@ -194,37 +232,21 @@ try:
                     if time.time() - PosEdgeTime > Finish_Timeout: # Look for a long time without a positive edge to identify the end
                         if Finished == False:
                             print("Selection: ", alpha-1, numeric)
-                            addToPlaylist((alpha - 2) * numbers + numeric)
+                            playerFound = addToPlaylist((alpha - 2) * numbers + numeric)
                             if playerFound == True:
-                                # Flash green LED for 1s
-                                GPIO.output(pinTrackRequestLED, True)
-                                time.sleep(1)
-                                GPIO.output(pinTrackRequestLED, False)
+                                # Flash green LED for 1s...
+                                blink(pinTrackRequestLED, 1.0, 0.125, 1, False)
                             else:
+                                # Flash green LED four times...
                                 print("Player unavailable")
-                                GPIO.output(pinTrackRequestLED, True)
-                                time.sleep(0.125)
-                                GPIO.output(pinTrackRequestLED, False)
-                                time.sleep(0.125)
-                                GPIO.output(pinTrackRequestLED, True)
-                                time.sleep(0.125)
-                                GPIO.output(pinTrackRequestLED, False)
-                                time.sleep(0.125)
-                                GPIO.output(pinTrackRequestLED, True)
-                                time.sleep(0.125)
-                                GPIO.output(pinTrackRequestLED, False)
-                                time.sleep(0.125)
-                                GPIO.output(pinTrackRequestLED, True)
-                                time.sleep(0.125)
-                                GPIO.output(pinTrackRequestLED, False)
-                                time.sleep(0.125)
+                                blink(pinTrackRequestLED, 0.125, 0.125, 4, False)
 
                             Finished = True
 
                 NegEdgeTime = time.time()
                 HighTime = NegEdgeTime - PosEdgeTime
                 GPIO.output(pinWallboxSignalLED, True)
-                print("High time: ", HighTime)
+                #print("High time: ", HighTime)
 
                 if Finished: #
                     #print("Starting Alpha...")
@@ -248,7 +270,7 @@ try:
                 PosEdgeTime = time.time()
                 LowTime = PosEdgeTime - NegEdgeTime
                 GPIO.output(pinWallboxSignalLED, False)
-                print("Low time: ", LowTime)
+                #print("Low time: ", LowTime)
 
                 if phase == 0:
                     alpha = alpha + 1
