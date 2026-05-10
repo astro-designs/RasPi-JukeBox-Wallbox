@@ -18,7 +18,7 @@ import urllib2
 import logging
 import argparse
 
-version = "1.1.1"
+version = "1.2.0"
 
 # Create log folder if it doesn't exist...
 if not os.path.exists('logs'):
@@ -102,21 +102,19 @@ def addToPlaylist(track):
     selection = '000' + str(track)
     selection = 'sel' + selection[-3:]
 
-    print("Requesting Track...")
+    message = ("Requesting Track: " + selection)
+    logger.info(message)
+    print(message)
     url = 'http://' + player_IP_Address + '/' + selection + '/add'
-    print("url: ",url)
 
     playerFound = False   # ensure always defined
 
     try:
         request = urllib2.Request(url)
-        print("Request: ",request)
-
         response = urllib2.urlopen(request, timeout=10)
         ack = response.read()  # avoids broken pipe
-        print("Response: ",response)
 
-        message = "Request to play selection " + selection
+        message = "Request OK: " + selection
         logger.info(message)
         print(message)
 
@@ -186,25 +184,27 @@ try:
         
             # Check Wallbox power...
             if GPIO.input(pinWallboxPower) == False:
-                print("Wallbox Power OK")
+                message = "Wallbox Power OK"
+                logger.info(message)
+                print(message)
                 GPIO.output(pinWallboxPowerLED, True)
             else:
-                print("Check Wallbox Power!")
+                message = "Check Wallbox Power!"
+                logger.info(message)
+                print(message)
                 GPIO.output(pinWallboxPowerLED, False)
 
             # Search for JukeBox player...
-            print("Looking for player at IP Address ", player_IP_Address)
+            message = "Looking for player at IP Address " + player_IP_Address
+            logger.info(message)
+            print(message)
             
-            #url = 'http://' + player_IP_Address + '/ping' #ping not supported
             url = 'http://' + player_IP_Address
+
             try:
                 request = urllib2.Request(url)
                 response = urllib2.urlopen(request, timeout=10)
                 ack = response.read()  # avoids broken pipe
-                print("Response: ",response)
-                message = "Player found at " + player_IP_Address
-                logger.info(message)
-                print(message)
                 playerFound = True
             except urllib2.HTTPError, e:
                 message = "HTTPError code: %s" % e.code
@@ -224,7 +224,9 @@ try:
                 playerFound = False
 
             if playerFound:
-                print("Player found")
+                message = "Player found at " + player_IP_Address
+                logger.info(message)
+                print(message)
                 GPIO.output(pinPlayerFoundLED, True)
             else:
                 message = "Player unavailable"
